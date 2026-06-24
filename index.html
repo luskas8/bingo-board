@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="./support.js"></script>
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+  <link rel="manifest" href="/site.webmanifest">
+</head>
+
+<body>
+  <x-dc>
+    <helmet>
+      <link rel="preconnect" href="https://fonts.googleapis.com">
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@600;700;800;900&display=swap" rel="stylesheet">
+      <style>
+        * {
+          box-sizing: border-box;
+        }
+
+        html,
+        body {
+          margin: 0;
+          padding: 0;
+          height: 100%;
+        }
+
+        button {
+          font-family: 'Inter', system-ui, sans-serif;
+        }
+      </style>
+    </helmet>
+    <div style="{{ pageStyle }}">
+
+      <header
+        style="display:flex;align-items:center;justify-content:space-between;gap:clamp(12px,1.8vw,36px);flex-shrink:0;flex-wrap:wrap;">
+
+        <div style="display:flex;flex-direction:column;gap:6px;min-width:0;">
+          <div
+            style="display:flex;gap:clamp(3px,0.4vw,8px);font-weight:900;line-height:1;font-size:clamp(30px,3.8vw,90px);letter-spacing:1px;">
+            <span style="color:#1565ff;">B</span><span style="color:#e02020;">I</span><span
+              style="{{ letterNStyle }}">N</span><span style="color:#0a9d3a;">G</span><span
+              style="color:#ff8c00;">O</span>
+          </div>
+          <div style="{{ progressStyle }}">{{ markedCount }} de 75 marcados</div>
+        </div>
+
+        <div role="status" aria-live="polite"
+          style="display:flex;flex-direction:column;align-items:center;gap:clamp(2px,0.4vh,8px);">
+          <div style="{{ lastLabelStyle }}">ÚLTIMO NÚMERO CHAMADO</div>
+          <div style="{{ lastBoxStyle }}">
+            <sc-if value="{{ hasLast }}" hint-placeholder-val="{{ true }}">
+              <span style="font-size:0.42em;font-weight:900;opacity:0.85;line-height:1;">{{ lastLetter }}</span>
+              <span style="font-weight:900;line-height:1;">{{ lastNum }}</span>
+            </sc-if>
+            <sc-if value="{{ noLast }}" hint-placeholder-val="{{ false }}">
+              <span style="font-weight:900;line-height:1;opacity:0.5;">—</span>
+            </sc-if>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:clamp(8px,1vw,16px);align-items:center;">
+          <button onClick="{{ toggleBrightness }}" aria-label="{{ sunBtnLabel }}" style="{{ sunBtnStyle }}"
+            style-focus="outline:4px solid #ff8c00;outline-offset:3px;">☀</button>
+          <button onClick="{{ toggleTheme }}" aria-label="{{ themeBtnLabel }}" style="{{ btnStyle }}"
+            style-focus="outline:4px solid #ff8c00;outline-offset:3px;">{{ themeBtnText }}</button>
+          <sc-if value="{{ notConfirming }}" hint-placeholder-val="{{ true }}">
+            <button onClick="{{ askReset }}" aria-label="Resetar tabuleiro" style="{{ resetBtnStyle }}"
+              style-focus="outline:4px solid #ff8c00;outline-offset:3px;">RESETAR</button>
+          </sc-if>
+          <sc-if value="{{ confirming }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;gap:8px;align-items:center;">
+              <button onClick="{{ doReset }}" style="{{ confirmYesStyle }}"
+                style-focus="outline:4px solid #fff;outline-offset:3px;">SIM, LIMPAR TUDO</button>
+              <button onClick="{{ cancelReset }}" style="{{ btnStyle }}"
+                style-focus="outline:4px solid #ff8c00;outline-offset:3px;">CANCELAR</button>
+            </div>
+          </sc-if>
+        </div>
+
+      </header>
+
+      <sc-if value="{{ showBrightnessPanel }}" hint-placeholder-val="{{ false }}">
+        <div style="{{ brightnessPanelStyle }}">
+          <span aria-hidden="true" style="font-size:1.4em;line-height:1;">🌑</span>
+          <input type="range" min="0.7" max="1.4" step="0.05" value="{{ brightness }}"
+            onChange="{{ onBrightnessChange }}" aria-label="Ajuste de brilho do ambiente" style="{{ rangeStyle }}" />
+          <span aria-hidden="true" style="font-size:1.4em;line-height:1;">🌕</span>
+        </div>
+      </sc-if>
+
+      <main style="{{ boardStyle }}">
+        <sc-for list="{{ columns }}" as="col" hint-placeholder-count="5">
+          <div
+            style="display:flex;flex-direction:column;gap:clamp(6px,min(0.9vw,1.1vh),18px);min-height:0;min-width:0;">
+            <div style="{{ col.headerStyle }}">{{ col.letter }}</div>
+            <sc-for list="{{ col.cells }}" as="cell" hint-placeholder-count="15">
+              <button onClick="{{ cell.onClick }}" aria-pressed="{{ cell.marked }}" aria-label="{{ cell.ariaLabel }}"
+                style="{{ cell.cellStyle }}" style-focus="outline:4px solid #ff8c00;outline-offset:2px;z-index:2;">
+                <span>{{ cell.n }}</span>
+                <sc-if value="{{ cell.marked }}" hint-placeholder-val="{{ false }}">
+                  <span aria-hidden="true"
+                    style="position:absolute;top:5%;right:8%;font-size:0.6em;font-weight:900;line-height:1;">✓</span>
+                </sc-if>
+              </button>
+            </sc-for>
+          </div>
+        </sc-for>
+      </main>
+
+    </div>
+  </x-dc>
+  <script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { theme: 'dark', marked: {}, last: null, confirming: false, brightness: 1.0, showBrightness: false };
+
+  toggle(n) {
+    this.setState(s => {
+      const marked = { ...s.marked };
+      let last = s.last;
+      if (marked[n]) {
+        delete marked[n];
+        if (last === n) last = null;
+      } else {
+        marked[n] = true;
+        last = n;
+      }
+      return { marked, last };
+    });
+  }
+
+  toggleTheme() {
+    this.setState(s => ({ theme: s.theme === 'dark' ? 'light' : 'dark' }));
+  }
+
+  askReset() { this.setState({ confirming: true }); }
+  cancelReset() { this.setState({ confirming: false }); }
+  doReset() { this.setState({ marked: {}, last: null, confirming: false }); }
+
+  setBrightness(val) {
+    this.setState({ brightness: Math.min(1.4, Math.max(0.7, val)) });
+  }
+  toggleBrightness() {
+    this.setState(s => ({ showBrightness: !s.showBrightness }));
+  }
+
+  renderVals() {
+    const dark = this.state.theme === 'dark';
+    const letters = ['B', 'I', 'N', 'G', 'O'];
+    const headerColors = { B: '#2979ff', I: '#ef5350', N: '#ab47bc', G: '#00c853', O: '#ff6d00' };
+    const marked = this.state.marked;
+
+    const baseCell = {
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      position: 'relative', flex: '1 1 0', width: '100%', minHeight: 0,
+      border: 'none', borderRadius: 'clamp(8px,0.8vw,14px)', cursor: 'pointer',
+      fontWeight: 900, fontFamily: "'Inter',system-ui,sans-serif", lineHeight: 1,
+      fontSize: 'clamp(22px, min(2.8vw, 3.2vh), 80px)', transition: 'transform .1s ease, background .1s ease',
+      padding: 0
+    };
+    const unmarked = dark
+      ? { background: '#111d52', color: '#e8edff', boxShadow: 'inset 0 0 0 4px #3a5299' }
+      : { background: '#ffffff', color: '#0a1a3f', boxShadow: 'inset 0 0 0 3px #0a1a3f' };
+    const markedStyle = dark
+      ? { background: '#FFD700', color: '#0a0a0a', boxShadow: 'inset 0 0 0 4px #ffffff' }
+      : { background: '#0033e6', color: '#ffffff', boxShadow: 'inset 0 0 0 5px #001a66, 0 6px 16px rgba(0,51,230,0.4)' };
+
+    const columns = letters.map((letter, ci) => {
+      const start = ci * 15 + 1;
+      const cells = [];
+      for (let i = 0; i < 15; i++) {
+        const n = start + i;
+        const m = !!marked[n];
+        cells.push({
+          n, marked: m,
+          ariaLabel: 'Número ' + n + ', coluna ' + letter + ', ' + (m ? 'sorteado' : 'não sorteado'),
+          cellStyle: { ...baseCell, ...(m ? markedStyle : unmarked) },
+          onClick: () => this.toggle(n)
+        });
+      }
+      return {
+        letter, cells,
+        headerStyle: {
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flex: '1.25 1 0', minHeight: 0, width: '100%',
+          background: headerColors[letter], color: '#ffffff',
+          borderRadius: 'clamp(8px,0.8vw,14px)', fontWeight: 900, lineHeight: 1,
+          fontFamily: "'Inter',system-ui,sans-serif", letterSpacing: '1px',
+          fontSize: 'clamp(36px, min(4.8vw, 5.5vh), 130px)',
+          boxShadow: dark ? 'inset 0 0 0 3px rgba(255,255,255,0.25)' : '0 4px 0 rgba(0,0,0,0.18)'
+        }
+      };
+    });
+
+    const last = this.state.last;
+    const hasLast = last != null;
+    const lastLetter = hasLast ? letters[Math.floor((last - 1) / 15)] : '';
+    const accent = dark ? '#FFD700' : '#0033e6';
+
+    const pageStyle = {
+      height: '100vh', width: '100%', display: 'flex', flexDirection: 'column',
+      gap: 'clamp(10px,1.6vh,24px)', padding: 'clamp(16px,2vw,48px)',
+      background: dark ? '#0d1b4b' : '#f7f8fc',
+      color: dark ? '#ffffff' : '#0a1a3f',
+      fontFamily: "'Inter',system-ui,sans-serif", overflow: 'hidden',
+      filter: `brightness(${this.state.brightness})`
+    };
+
+    const boardStyle = {
+      flex: '1 1 0', display: 'grid', gridTemplateColumns: 'repeat(5, minmax(66px,1fr))',
+      gap: 'clamp(8px, min(1.1vw, 1.3vh), 24px)', minHeight: 0, overflowX: 'auto', overflowY: 'hidden', paddingBottom: '2px'
+    };
+
+    const lastBoxStyle = {
+      display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '0.18em',
+      minWidth: 'clamp(120px,12vw,230px)', padding: '0.08em 0.3em',
+      borderRadius: 'clamp(12px,1vw,20px)',
+      background: dark ? '#0a1540' : '#ffffff',
+      color: accent,
+      boxShadow: 'inset 0 0 0 4px ' + accent + (dark ? ', 0 0 30px rgba(255,215,0,0.3)' : ', 0 6px 18px rgba(0,51,230,0.25)'),
+      fontSize: 'clamp(54px,9vw,180px)', lineHeight: 1
+    };
+
+    const lastLabelStyle = {
+      fontWeight: 800, letterSpacing: '3px',
+      fontSize: 'clamp(13px,1.4vw,26px)',
+      color: dark ? '#c8d4ff' : '#3a4a72'
+    };
+
+    const progressStyle = {
+      fontWeight: 700, fontSize: 'clamp(14px,1.4vw,22px)',
+      color: dark ? '#c8d4ff' : '#3a4a72'
+    };
+
+    const btnStyle = {
+      fontWeight: 800, fontSize: 'clamp(14px,1.4vw,22px)', cursor: 'pointer',
+      padding: 'clamp(12px,1.2vw,20px) clamp(16px,1.8vw,30px)', borderRadius: 'clamp(8px,0.8vw,12px)',
+      border: '3px solid ' + (dark ? '#5a5a68' : '#0a1a3f'),
+      background: dark ? '#1d1d24' : '#ffffff',
+      color: dark ? '#ffffff' : '#0a1a3f'
+    };
+    const resetBtnStyle = {
+      ...btnStyle,
+      border: '3px solid #e02020', color: dark ? '#ff5a5a' : '#c00',
+      background: dark ? '#1d1d24' : '#ffffff'
+    };
+    const confirmYesStyle = {
+      ...btnStyle, border: '3px solid #e02020', background: '#e02020', color: '#ffffff'
+    };
+
+    const brightness = this.state.brightness;
+    const sunOpacity = 0.5 + (brightness - 0.7) / 0.7 * 0.5;
+    const showBrightnessPanel = this.state.showBrightness;
+
+    return {
+      pageStyle, boardStyle, columns,
+      hasLast, noLast: !hasLast, lastLetter, lastNum: last,
+      lastBoxStyle, lastLabelStyle, progressStyle,
+      markedCount: Object.keys(marked).length,
+      letterNStyle: { color: dark ? '#ab47bc' : '#7a3ff0' },
+      toggleTheme: () => this.toggleTheme(),
+      themeBtnText: dark ? 'MODO CLARO' : 'MODO ESCURO',
+      themeBtnLabel: dark ? 'Mudar para modo claro' : 'Mudar para modo escuro',
+      askReset: () => this.askReset(),
+      doReset: () => this.doReset(),
+      cancelReset: () => this.cancelReset(),
+      confirming: this.state.confirming,
+      notConfirming: !this.state.confirming,
+      btnStyle, resetBtnStyle, confirmYesStyle,
+      brightness,
+      showBrightnessPanel,
+      showBrightnessPanelNot: !showBrightnessPanel,
+      onBrightnessChange: (e) => this.setBrightness(parseFloat(e.target.value)),
+      toggleBrightness: () => this.toggleBrightness(),
+      sunBtnLabel: showBrightnessPanel ? 'Fechar ajuste de brilho' : 'Ajustar brilho do ambiente',
+      sunBtnStyle: {
+        ...btnStyle,
+        border: '3px solid ' + (dark ? '#FFD700' : '#b8860b'),
+        color: dark ? '#FFD700' : '#b8860b',
+        opacity: sunOpacity,
+        fontSize: 'clamp(16px,1.6vw,26px)',
+        padding: 'clamp(10px,1vw,16px)',
+      },
+      brightnessPanelStyle: {
+        display: 'flex', alignItems: 'center', gap: '16px',
+        padding: '12px 20px',
+        background: dark ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.7)',
+        borderRadius: '12px',
+        flexShrink: 0,
+      },
+      rangeStyle: {
+        flex: '1', accentColor: dark ? '#FFD700' : '#0033e6',
+        height: '6px', cursor: 'pointer',
+      },
+    };
+  }
+}
+</script>
+</body>
+
+</html>
