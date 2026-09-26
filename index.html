@@ -65,32 +65,43 @@
         </div>
 
         <div style="display:flex;gap:clamp(8px,1vw,16px);align-items:center;">
-          <button onClick="{{ toggleBrightness }}" aria-label="{{ sunBtnLabel }}" style="{{ sunBtnStyle }}"
-            style-focus="outline:4px solid #ff8c00;outline-offset:3px;">☀</button>
-          <button onClick="{{ toggleTheme }}" aria-label="{{ themeBtnLabel }}" style="{{ btnStyle }}"
-            style-focus="outline:4px solid #ff8c00;outline-offset:3px;">{{ themeBtnText }}</button>
-          <sc-if value="{{ notConfirming }}" hint-placeholder-val="{{ true }}">
-            <button onClick="{{ askReset }}" aria-label="Resetar tabuleiro" style="{{ resetBtnStyle }}"
-              style-focus="outline:4px solid #ff8c00;outline-offset:3px;">RESETAR</button>
-          </sc-if>
-          <sc-if value="{{ confirming }}" hint-placeholder-val="{{ false }}">
-            <div style="display:flex;gap:8px;align-items:center;">
-              <button onClick="{{ doReset }}" style="{{ confirmYesStyle }}"
-                style-focus="outline:4px solid #fff;outline-offset:3px;">SIM, LIMPAR TUDO</button>
-              <button onClick="{{ cancelReset }}" style="{{ btnStyle }}"
-                style-focus="outline:4px solid #ff8c00;outline-offset:3px;">CANCELAR</button>
-            </div>
-          </sc-if>
+          <button onClick="{{ undo }}" disabled="{{ undoDisabled }}" aria-label="Desfazer última marcação"
+            style="{{ undoBtnStyle }}" style-focus="outline:4px solid #ff8c00;outline-offset:3px;">↶ DESFAZER</button>
+          <button onClick="{{ redo }}" disabled="{{ redoDisabled }}" aria-label="Refazer marcação desfeita"
+            style="{{ redoBtnStyle }}" style-focus="outline:4px solid #ff8c00;outline-offset:3px;">↷ REFAZER</button>
+          <button onClick="{{ openSettings }}" aria-label="Abrir configurações" style="{{ btnStyle }}"
+            style-focus="outline:4px solid #ff8c00;outline-offset:3px;">⚙</button>
         </div>
 
       </header>
 
-      <sc-if value="{{ showBrightnessPanel }}" hint-placeholder-val="{{ false }}">
-        <div style="{{ brightnessPanelStyle }}">
-          <span aria-hidden="true" style="font-size:1.4em;line-height:1;">🌑</span>
-          <input type="range" min="0.7" max="1.4" step="0.05" value="{{ brightness }}"
-            onChange="{{ onBrightnessChange }}" aria-label="Ajuste de brilho do ambiente" style="{{ rangeStyle }}" />
-          <span aria-hidden="true" style="font-size:1.4em;line-height:1;">🌕</span>
+      <sc-if value="{{ showSettings }}" hint-placeholder-val="{{ false }}">
+        <div style="{{ modalOverlayStyle }}">
+          <div style="{{ modalPanelStyle }}">
+            <div style="{{ brightnessPanelStyle }}">
+              <span aria-hidden="true" style="font-size:1.4em;line-height:1;">🌑</span>
+              <input type="range" min="0.7" max="1.4" step="0.05" value="{{ brightness }}"
+                onChange="{{ onBrightnessChange }}" aria-label="Ajuste de brilho do ambiente"
+                style="{{ rangeStyle }}" />
+              <span aria-hidden="true" style="font-size:1.4em;line-height:1;">🌕</span>
+            </div>
+            <button onClick="{{ toggleTheme }}" style="{{ btnStyle }}"
+              style-focus="outline:4px solid #ff8c00;outline-offset:3px;">{{ themeBtnLabel }}</button>
+            <sc-if value="{{ notConfirming }}" hint-placeholder-val="{{ true }}">
+              <button onClick="{{ askReset }}" style="{{ resetBtnStyle }}"
+                style-focus="outline:4px solid #ff8c00;outline-offset:3px;">Resetar tabuleiro</button>
+            </sc-if>
+            <sc-if value="{{ confirming }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;gap:8px;align-items:center;">
+                <button onClick="{{ doReset }}" style="{{ confirmYesRowStyle }}"
+                  style-focus="outline:4px solid #fff;outline-offset:3px;">Confirmar</button>
+                <button onClick="{{ cancelReset }}" style="{{ cancelRowStyle }}"
+                  style-focus="outline:4px solid #ff8c00;outline-offset:3px;">CANCELAR</button>
+              </div>
+            </sc-if>
+            <button onClick="{{ closeSettings }}" style="{{ btnStyle }}"
+              style-focus="outline:4px solid #ff8c00;outline-offset:3px;">Fechar configurações</button>
+          </div>
         </div>
       </sc-if>
 
@@ -117,7 +128,10 @@
   </x-dc>
   <script type="text/x-dc" data-dc-script>
 class Component extends DCLogic {
-  state = { theme: 'dark', marked: {}, last: null, confirming: false, brightness: 1.0, showBrightness: false };
+  state = {
+    theme: 'dark', marked: {}, last: null, confirming: false, brightness: 1.0,
+    showSettings: false, history: [], future: []
+  };
 
   toggle(n) {
     this.setState(s => {
@@ -130,7 +144,35 @@ class Component extends DCLogic {
         marked[n] = true;
         last = n;
       }
-      return { marked, last };
+      return {
+        marked, last,
+        history: [...s.history, { marked: s.marked, last: s.last }],
+        future: []
+      };
+    });
+  }
+
+  undo() {
+    this.setState(s => {
+      if (!s.history.length) return {};
+      const prev = s.history[s.history.length - 1];
+      return {
+        marked: prev.marked, last: prev.last,
+        history: s.history.slice(0, -1),
+        future: [...s.future, { marked: s.marked, last: s.last }]
+      };
+    });
+  }
+
+  redo() {
+    this.setState(s => {
+      if (!s.future.length) return {};
+      const next = s.future[s.future.length - 1];
+      return {
+        marked: next.marked, last: next.last,
+        future: s.future.slice(0, -1),
+        history: [...s.history, { marked: s.marked, last: s.last }]
+      };
     });
   }
 
@@ -140,14 +182,13 @@ class Component extends DCLogic {
 
   askReset() { this.setState({ confirming: true }); }
   cancelReset() { this.setState({ confirming: false }); }
-  doReset() { this.setState({ marked: {}, last: null, confirming: false }); }
+  doReset() { this.setState({ marked: {}, last: null, confirming: false, history: [], future: [] }); }
 
   setBrightness(val) {
     this.setState({ brightness: Math.min(1.4, Math.max(0.7, val)) });
   }
-  toggleBrightness() {
-    this.setState(s => ({ showBrightness: !s.showBrightness }));
-  }
+  openSettings() { this.setState({ showSettings: true }); }
+  closeSettings() { this.setState({ showSettings: false, confirming: false }); }
 
   renderVals() {
     const dark = this.state.theme === 'dark';
@@ -239,7 +280,8 @@ class Component extends DCLogic {
 
     const btnStyle = {
       fontWeight: 800, fontSize: 'clamp(14px,1.4vw,22px)', cursor: 'pointer',
-      padding: 'clamp(12px,1.2vw,20px) clamp(16px,1.8vw,30px)', borderRadius: 'clamp(8px,0.8vw,12px)',
+      height: 'clamp(50px,5.5vh,66px)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: '0 clamp(16px,1.8vw,30px)', borderRadius: 'clamp(8px,0.8vw,12px)',
       border: '3px solid ' + (dark ? '#5a5a68' : '#0a1a3f'),
       background: dark ? '#1d1d24' : '#ffffff',
       color: dark ? '#ffffff' : '#0a1a3f'
@@ -254,8 +296,10 @@ class Component extends DCLogic {
     };
 
     const brightness = this.state.brightness;
-    const sunOpacity = 0.5 + (brightness - 0.7) / 0.7 * 0.5;
-    const showBrightnessPanel = this.state.showBrightness;
+    const showSettings = this.state.showSettings;
+    const undoDisabled = this.state.history.length === 0;
+    const redoDisabled = this.state.future.length === 0;
+    const disabledBtnStyle = { opacity: 0.4, cursor: 'not-allowed' };
 
     return {
       pageStyle, boardStyle, columns,
@@ -264,27 +308,42 @@ class Component extends DCLogic {
       markedCount: Object.keys(marked).length,
       letterNStyle: { color: dark ? '#ab47bc' : '#7a3ff0' },
       toggleTheme: () => this.toggleTheme(),
-      themeBtnText: dark ? 'MODO CLARO' : 'MODO ESCURO',
       themeBtnLabel: dark ? 'Mudar para modo claro' : 'Mudar para modo escuro',
       askReset: () => this.askReset(),
       doReset: () => this.doReset(),
       cancelReset: () => this.cancelReset(),
       confirming: this.state.confirming,
       notConfirming: !this.state.confirming,
-      btnStyle, resetBtnStyle, confirmYesStyle,
+      btnStyle, resetBtnStyle,
       brightness,
-      showBrightnessPanel,
-      showBrightnessPanelNot: !showBrightnessPanel,
+      showSettings,
+      openSettings: () => this.openSettings(),
+      closeSettings: () => this.closeSettings(),
       onBrightnessChange: (e) => this.setBrightness(parseFloat(e.target.value)),
-      toggleBrightness: () => this.toggleBrightness(),
-      sunBtnLabel: showBrightnessPanel ? 'Fechar ajuste de brilho' : 'Ajustar brilho do ambiente',
-      sunBtnStyle: {
-        ...btnStyle,
-        border: '3px solid ' + (dark ? '#FFD700' : '#b8860b'),
-        color: dark ? '#FFD700' : '#b8860b',
-        opacity: sunOpacity,
-        fontSize: 'clamp(16px,1.6vw,26px)',
-        padding: 'clamp(10px,1vw,16px)',
+      undo: () => this.undo(),
+      redo: () => this.redo(),
+      undoDisabled, redoDisabled,
+      undoBtnStyle: { ...btnStyle, ...(undoDisabled ? disabledBtnStyle : {}) },
+      redoBtnStyle: { ...btnStyle, ...(redoDisabled ? disabledBtnStyle : {}) },
+      modalOverlayStyle: {
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        zIndex: 10,
+      },
+      modalPanelStyle: {
+        display: 'flex', flexDirection: 'column', gap: '16px',
+        padding: 'clamp(20px,2.4vw,36px)', width: 'min(90vw,420px)',
+        background: dark ? '#111d52' : '#ffffff',
+        borderRadius: 'clamp(12px,1.2vw,20px)',
+        boxShadow: '0 12px 40px rgba(0,0,0,0.4)',
+      },
+      confirmYesRowStyle: {
+        ...confirmYesStyle, flex: '1 1 0', minWidth: 0,
+        padding: '0 clamp(6px,1vw,16px)',
+      },
+      cancelRowStyle: {
+        ...btnStyle, flex: '1 1 0', minWidth: 0,
+        padding: '0 clamp(6px,1vw,16px)',
       },
       brightnessPanelStyle: {
         display: 'flex', alignItems: 'center', gap: '16px',
